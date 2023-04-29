@@ -8,7 +8,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
-random.seed(44)
+random.seed(144)
 
 with open('datasets/clean/viability.json') as fl:
   viability_map = json.load(fl)
@@ -25,8 +25,8 @@ for pokelog in os.listdir('datasets/clean/pokelogs'):
   if df.isnull().values.any():
     print('uh')
   if df.shape[0] < IMG_ROWS*CHUNK_SIZE: continue
-  df = shuffle(df.drop('opponent', axis=1)).reset_index(drop=True)
-  # df = df.drop('opponent', axis=1)
+  # df = shuffle(df.drop('opponent', axis=1)).reset_index(drop=True)
+  df = df.drop('opponent', axis=1)
   pokename = os.path.splitext(pokelog)[0]
   label = viability_map[pokename]
   
@@ -60,7 +60,10 @@ for score in scores:
   _testing_images, _training_images = [], []
   
   for pokename, images in data:
-    if len(_training_images) > 300:
+    if len(images) >= 300:
+      images = images[:300]
+      
+    if len(_training_images) >= 600:
       TEST=True
     elif len(_testing_images) / class_size >= TESTING:
       TEST=False
@@ -71,10 +74,15 @@ for score in scores:
     else:
       TEST=False
     
-    if TEST and len(_testing_images) < 150:
-      _testing_images.extend(images)
-      testing_pokes.extend([pokename]*len(images))
-      testing_labels.extend([score]*len(images))
+    if TEST:
+      if len(_testing_images) < 300:
+        _testing_images.extend(images)
+        testing_pokes.extend([pokename]*len(images))
+        testing_labels.extend([score]*len(images))
+      elif len(_training_images) < 600:
+        _training_images.extend(images)
+        training_pokes.extend([pokename]*len(images))
+        training_labels.extend([score]*len(images))
     else:
       _training_images.extend(images)
       training_pokes.extend([pokename]*len(images))

@@ -1,7 +1,11 @@
 import csv
+import itertools
 import json
 import os
 import re
+
+import pandas as pd
+
 undetected_effects = []
 undetected_switch_effects = []
 undetected_actions = []
@@ -63,7 +67,7 @@ def team_detect(log: str) -> tuple[list[str], list[str], str]:
 
 def rating_check(log: str) -> tuple[bool, list[int]]:
   if '|rated|' not in log or '|rated|Tournament' in log:
-    return False, []
+    return False, [1000, 1000]
   log = log[log.find('|rated|'):]
   
   ratings = re.findall(r': (\d+)', log[log.find("'s rating"):])
@@ -71,7 +75,7 @@ def rating_check(log: str) -> tuple[bool, list[int]]:
 
 def winner_check(log: str) -> float:
   try:
-    playernick = log[log.rindex('|win|'):].split('|')[2]
+    playernick = log[log.rindex('|win|'):].split('|')[2].strip()
     if f'|player|p1|{playernick}' in log: return 0
     else: return 1
   except:
@@ -334,21 +338,65 @@ def turns_parse(log: str, weight: float, winner: float):
     rows.append(prevrow := turn_handle(pieces, nturns, prevrow, weight, winner))
   return rows
 
+with open('datasets/clean/dex.json') as fl:
+  dex = json.load(fl)
+
+with open('datasets/clean/battlestats.json') as fl:
+  bs = json.load(fl)
+
+poketypes = ['Normal', 'Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug', 'Ghost', 'Steel', 'Fire', 'Water', 'Grass', 'Electric', 'Psychic', 'Ice', 'Dragon', 'Dark', 'Fairy']
+
+forme_names = ['Gastrodon', 'Sawsbuck', 'Tatsugiri', 'Vivillon', 'Florges', 'Floette']
+def embed_pokemon(pokemon_name):
+  for x in forme_names:
+    if pokemon_name.startswith(x):
+      pokemon_name = x
+      break
+      
+  toret = []
+  entry = dex[pokemon_name]
+  bsentry = bs.get(pokemon_name, {'usage': 0, 'vdecay': [0, 0, 0]})
+  
+  # toret.extend([int(type_ in entry['types']) for type_ in poketypes])
+  toret.extend(entry['baseStats'].values())
+  toret.append(sum(entry['baseStats'].values()))
+  # toret.append(entry['heightm'])
+  # toret.append(entry['weightkg'])
+  toret.append(bsentry['usage'])
+  toret.append(bsentry['vdecay'][0])
+  toret.append(bsentry['vdecay'][1])
+  toret.append(bsentry['vdecay'][2])
+  return toret
+  
 if __name__ == '__main__':
+  teams_winner = []
   for logname in os.listdir('datasets/logs'):
     with open(f'datasets/logs/{logname}', encoding='utf-8') as fl:
       log = fl.read()
-      if '|teampreview' not in log or 'Dudunsparce' in log or 'Mimikyu' in log or 'Urshifu' in log or 'Eiscue' in log: continue
-      game_parse(log)
-      rated, weights = rating_check(log)
-      winner = winner_check(log)
-      if rated: weight = max(min(0.2 + (((weights[0]+weights[1])/2)-1000)/500, 1), 0.2)
-      else: weight = 0.2
-      assert 0.2 <= weight <= 1
-      outdict = turns_parse(log, weight, winner)
+    team0, team1, _ = team_detect(log)
+    if not (len(team0) == len(team1) == 6):
+      continue
+    if '|teampreview' not in log or 'Dudunsparce' in log or 'Mimikyu' in log or 'Urshifu' in log or 'Eiscue' in log: continue
+    game_parse(log)
+    rated, weights = rating_check(log)
+    winner = winner_check(log)
+    if rated: weight = max(min(0.2 + (((weights[0]+weights[1])/2)-1000)/500, 1), 0.2)
+    else: weight = 0.2
+    assert 0.2 <= weight <= 1
+    outdict = turns_parse(log, weight, winner)
     if len(outdict) < 5:  # equal to number of turns
       continue
+      
     with open(f'datasets/clean/logs/{os.path.splitext(logname)[0]}.csv', mode='w+', encoding='utf-8') as fl:
       writer = csv.DictWriter(fl, fieldnames=outdict[0].keys(), delimiter='\t', lineterminator='\n')
       writer.writeheader()
       writer.writerows(outdict)
+    
+    embeds0 = sorted([embed_pokemon(pokename) for pokename in team0], key=lambda x: x[-4])
+    embeds1 = sorted([embed_pokemon(pokename) for pokename in team1], key=lambda x: x[-4])
+    team0embed = list(itertools.chain.from_iterable(embeds0))
+    team1embed = list(itertools.chain.from_iterable(embeds1))
+    teams_winner.append([*team0embed, *team1embed, *(weights[:2]), winner])
+  
+  pd.DataFrame(teams_winner).to_csv(f'datasets/clean/winners.tsv', sep='\t', index=False, header=False)
+  
