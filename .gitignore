@@ -1,4 +1,7 @@
-datasets/*
+datasets/raw/*
+datasets/logs/*
+datasets/clean/logs/*
+datasets/clean/pokelogs/*
 node_modules/*
 venv/*
 .idea/*

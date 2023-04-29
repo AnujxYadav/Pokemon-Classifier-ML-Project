@@ -1,0 +1,20 @@
+- action
+	- attack
+	- switch
+
+- consequence
+	- damage [faint]
+	- boost
+	- deboost
+	- heal
+	- switch
+
+- endturn
+	- damage
+	- heal
+	- switch [follows faint]
+
+P0:
+pokemon | switch | damage dealt | effectiveness | damage taken | effectiveness | heal | faint | boost_off | boost_def | boost_spe | deboost_off | deboost_def | deboost_spe
+P1: ''
+turn {0-1} | turn | weight
