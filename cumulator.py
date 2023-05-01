@@ -16,7 +16,8 @@ for SLICESIZE in [5, 10, 15, 20]:
   test_labels = []
   test_cuml_slices = []
   
-  for filename in random.choices(os.listdir('datasets/clean/logs'), k=1500):
+  flnames = random.choices(os.listdir('datasets/clean/logs'), k=2000)
+  for filename in flnames[:1500]:
     if random.random() < 0.7: GOTO='train'
     else: GOTO='test'
     log_ = pd.read_csv(f'datasets/clean/logs/{filename}', sep='\t')
@@ -33,6 +34,8 @@ for SLICESIZE in [5, 10, 15, 20]:
         train_slices.append(log.loc[i-SLICESIZE: i-1].values.astype(float).tolist())
         train_labels.append(int(winner))
         train_cuml_slices.append(np.sum(log.loc[i-SLICESIZE: i-1].values.astype(float), axis=0).tolist())
+  
+  next_tests = flnames[1500:]
   
   def pair_shuffle(a, b, c):
     toret = list(zip(a, b, c))
@@ -51,3 +54,6 @@ for SLICESIZE in [5, 10, 15, 20]:
       'test_y': test_labels,
       'test_sum_X': test_cuml_slices
     }, fl)
+  
+  with open(f'datasets/clean/next_tests.txt', mode='w+') as fl:
+    fl.write('\n'.join(next_tests))
